@@ -1,11 +1,13 @@
-from PyQt5.QtWidgets import (QApplication, QWidget, QTextEdit, QComboBox, QPushButton, QLabel, QHBoxLayout, QVBoxLayout)
+from PyQt5.QtWidgets import (QApplication, QWidget, QTextEdit, QComboBox, QPushButton, QLabel, QHBoxLayout, QVBoxLayout, QStackedWidget, QListWidget)
 from googletrans import Translator
 from PyQt5.QtGui import QFont
 from languages import *
+from gtts import gTTS
 import asyncio
-# maken van app
+import os
 
 
+#start van app maken
 class Home(QWidget):
     def __init__(self):
         super().__init__()
@@ -19,15 +21,19 @@ class Home(QWidget):
         self.reverse_button = QPushButton("Reverse")
         self.reset = QPushButton("Reset")
         self.submit = QPushButton("Translate text")
+        self.copybutton = QPushButton("Copy to clipboard")
+        self.history_button = QPushButton("History")
         self.input_option = QComboBox()
         self.output_option = QComboBox()
+        self.speechbutton = QPushButton("Pronounce text")
+        self.slow_speechbutton = QPushButton("Pronounce text slowly")
 
-
+        #dropdown menu's available languages
         self.input_option.addItems(values)
         self.output_option.addItems(values)
 
         self.title = QLabel("Le Translator")
-        self.title.setFont(QFont("Times new Roman", 40))
+        self.title.setFont(QFont("Times new Roman", 35))
 
         self.master_layout = QHBoxLayout()
         col1 = QVBoxLayout()
@@ -38,26 +44,29 @@ class Home(QWidget):
         col1.addWidget(self.output_option)
         col1.addWidget(self.submit)
         col1.addWidget(self.reset)
+        col1.addWidget(self.copybutton)
+        col1.addWidget(self.speechbutton)
+        col1.addWidget(self.slow_speechbutton)
 
         col2.addWidget(self.input_box)
         col2.addWidget(self.output_box)
         col2.addWidget(self.reverse_button)
+        col2.addWidget(self.history_button)
 
-        self.master_layout.addLayout(col1, 20)
-        self.master_layout.addLayout(col2, 80)
+        self.master_layout.addLayout(col1, 10)
+        self.master_layout.addLayout(col2, 90)
 
-        self.setLayout(self.master_layout)
 
         self.setStyleSheet("""
         QWidget {
             background-color: #333;
-            color: #fff;
+            color: #4db8db;
         }
         
         QPushButton {
             background-color: #66a3ff;
             color: #333;
-            border: 1px solid #fff;
+            border: 1px solid #632273;
             border-radius: 5px;
             padding: 5px 10px;
             }
@@ -67,16 +76,69 @@ class Home(QWidget):
             }
         """)
 
+        # Main screen
+        self.translator_screen = QWidget()
+        self.translator_screen.setLayout(self.master_layout)
+
+        #history screen
+        self.history_screen = QWidget()
+        history_layout = QVBoxLayout()
+        self.history_title = QLabel("Translation history")
+        self.history_title.setFont(QFont("Times new Roman", 25))
+        self.history_list = QListWidget()
+        self.return_button = QPushButton("Return to translate")
+
+        history_layout.addWidget(self.history_title)
+        history_layout.addWidget(self.history_list)
+        history_layout.addWidget(self.return_button)
+        self.history_screen.setLayout(history_layout)
+
+        self.stack = QStackedWidget()
+        self.stack.addWidget(self.translator_screen)
+        self.stack.addWidget(self.history_screen)
+
+        main_layout = QVBoxLayout()
+        main_layout.addWidget(self.stack)
+        self.setLayout(main_layout)
+
+
 
 
     def settings(self):
         self.setWindowTitle("Translator")
-        self.setGeometry(250, 250, 600, 500)
+        self.setGeometry(250, 250, 800, 700)
 
     def button_click(self):
         self.submit.clicked.connect(self.translate_click)
         self.reset.clicked.connect(self.reset_app)
         self.reverse_button.clicked.connect(self.reverse)
+        self.copybutton.clicked.connect(self.copy_to_clipboard)
+        self.history_button.clicked.connect(lambda: self.stack.setCurrentWidget(self.history_screen))
+        self.return_button.clicked.connect(lambda: self.stack.setCurrentWidget(self.translator_screen))
+        self.speechbutton.clicked.connect(self.pronounce_text)
+        self.slow_speechbutton.clicked.connect(self.slowly_pronounce_text)
+
+    def copy_to_clipboard(self):
+        clipboard = QApplication.clipboard()
+        clipboard.setText(self.output_box.toPlainText())
+
+    def pronounce_text(self):
+        text = self.output_box.toPlainText()
+        language_code = self.output_option.currentText()
+        lang = [key for key, value in LANGUAGES.items() if value == language_code][0]
+        if text:
+            tts = gTTS(text=text, lang = lang, slow=False)
+            tts.save("output.mp3")
+            os.system("start output.mp3")
+
+    def slowly_pronounce_text(self):
+        text = self.output_box.toPlainText()
+        language_code = self.output_option.currentText()
+        lang = [key for key, value in LANGUAGES.items() if value == language_code][0]
+        if text:
+            tts = gTTS(text=text, lang=lang, slow=True)
+            tts.save("output_slow.mp3")
+            os.system("start output_slow.mp3")
 
     def translate_click(self):
         value_to_key1 = self.output_option.currentText()
@@ -91,6 +153,7 @@ class Home(QWidget):
 
         self.script = self.translate_text(self.input_box.toPlainText(), key_to_value1, key_to_value2)
         self.output_box.setText(self.script)
+        self.history_list.addItem(f"{self.input_box.toPlainText()} ({value_to_key2}) -> {self.script} ({value_to_key1})")
 
     def reset_app(self):
         self.input_box.clear()
